@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#0F172A">
+<title>شِفت بصمة | نظام متابعة الحضور والانصراف</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+tailwind.config={theme:{extend:{colors:{bgDark:'#101827',cardBg:'#1E293B',cardBgDark:'#0F172A',tealPrimary:'#0F766E',tealHover:'#115E59',cyanSecondary:'#67E8F9',greenSuccess:'#34D399',goldWarning:'#FBBF24',textMuted:'#94A3B8',textLight:'#F1F5F9'},fontFamily:{cairo:['Cairo','sans-serif']}}}}
+</script>
+<style>
+body{font-family:Cairo,sans-serif;background:#101827;color:#F1F5F9;user-select:none;-webkit-tap-highlight-color:transparent;min-height:100dvh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#0F172A}::-webkit-scrollbar-thumb{background:#334155;border-radius:4px}
+.tab-btn.active{color:#67E8F9;border-bottom:3px solid #67E8F9;background:rgba(15,118,110,.15)}
+input,select,textarea{max-width:100%}
+.modal-backdrop{background:rgba(0,0,0,.72)}
+.field{background:#0F172A;border:1px solid #334155;border-radius:10px;padding:8px;color:#F1F5F9;font-size:12px;min-width:0}
+@media (max-width:430px){
+  body{padding-bottom:calc(60px + env(safe-area-inset-bottom));}
+  main{padding:10px !important;}
+  .compact-stack > * + *{margin-top:10px !important;}
+  .compact-card{padding:10px !important;border-radius:14px !important;}
+}
+nav{padding-bottom:env(safe-area-inset-bottom);}
+@media print{
+  .no-print{display:none!important}
+  header,nav{display:none!important}
+  #screen-main,#screen-settings{display:none!important}
+  #screen-reports{display:block!important}
+  body{background:#fff!important;color:#000!important;padding-bottom:0!important}
+  .print-area,.print-area *{background:#fff!important;color:#000!important;border-color:#999!important;box-shadow:none!important}
+  .print-table{width:100%!important;border-collapse:collapse!important}
+  .print-table th,.print-table td{border:1px solid #999!important;padding:6px!important;text-align:right!important;color:#000!important}
+}
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<header class="bg-cardBgDark border-b border-slate-800 sticky top-0 z-40 shadow-md no-print">
+  <div class="max-w-5xl mx-auto px-3 py-2 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-9 h-9 rounded-xl bg-tealPrimary flex items-center justify-center text-cyanSecondary text-base">
+        <i class="fa-solid fa-user-clock"></i>
+      </div>
+      <div class="leading-tight">
+        <h1 class="font-bold text-sm text-white">شِفت بصمة</h1>
+        <p class="text-[10px] text-textMuted">متابعة الحضور</p>
+      </div>
+    </div>
+    <div class="text-left leading-tight">
+      <div id="liveTimeHeader" class="text-base font-bold text-cyanSecondary font-mono">--:--:--</div>
+      <div id="liveDateHeader" class="text-[10px] text-textMuted">--</div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto w-full px-3 py-3 flex-grow compact-stack space-y-3">
+
+<div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-[80] hidden">
+  <div id="toastContent" class="px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold border bg-slate-900"></div>
+</div>
+
+<section id="screen-main" class="compact-stack space-y-3">
+  <div id="alertsPanel" class="hidden bg-amber-950/50 border border-amber-700/60 rounded-xl p-3 space-y-2 text-xs no-print"></div>
+  <div class="compact-card bg-cardBg rounded-2xl p-3 border border-slate-700/60 shadow-xl space-y-3">
+    <div class="flex items-center justify-between gap-2">
+      <h2 class="text-sm font-bold"><i class="fa-solid fa-fingerprint text-cyanSecondary ml-1"></i>تسجيل الدوام</h2>
+      <span id="todayStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-textMuted">لم يتم التسجيل بعد</span>
+    </div>
+    <button id="btnMainAction" onclick="handleMainAction()"
+            class="w-full py-3 px-4 bg-tealPrimary hover:bg-tealHover text-white font-bold text-base rounded-xl shadow-lg flex items-center justify-center gap-2 transition-opacity">
+      <i id="btnActionIcon" class="fa-solid fa-fingerprint text-xl text-cyanSecondary"></i>
+      <span id="btnActionText">تسجيل الحضور الآن</span>
+    </button>
+    <div class="grid grid-cols-4 gap-1.5 text-center">
+      <div class="bg-cardBgDark p-2 rounded-lg border border-slate-800">
+        <span class="text-[9px] text-textMuted block">بداية</span>
+        <span id="dispOfficialStart" class="text-[11px] font-bold">07:00 ص</span>
+      </div>
+      <div class="bg-cardBgDark p-2 rounded-lg border border-slate-800">
+        <span class="text-[9px] text-textMuted block">ساعات</span>
+        <span id="dispShiftHours" class="text-[11px] font-bold">8.5 س</span>
+      </div>
+      <div class="bg-cardBgDark p-2 rounded-lg border border-slate-800">
+        <span class="text-[9px] text-textMuted block">حضور</span>
+        <span id="dispActualIn" class="text-[11px] font-bold text-greenSuccess">--:--</span>
+      </div>
+      <div class="bg-cardBgDark p-2 rounded-lg border border-slate-800">
+        <span class="text-[9px] text-textMuted block">انصراف</span>
+        <span id="dispActualOut" class="text-[11px] font-bold text-textMuted">--:--</span>
+      </div>
+    </div>
+    <div class="bg-cardBgDark rounded-xl p-2 border border-slate-800">
+      <div class="flex items-center justify-between cursor-pointer" onclick="toggleManualAdjustment()">
+        <div class="text-xs font-medium text-cyanSecondary">
+          <i class="fa-solid fa-pen-to-square ml-1"></i>تعديل يدوي للوقت
+        </div>
+        <i id="manualChevron" class="fa-solid fa-chevron-down text-xs transition-transform"></i>
+      </div>
+      <div id="manualTimeBox" class="hidden pt-2 mt-2 border-t border-slate-800 space-y-2">
+        <div class="grid grid-cols-2 gap-1.5">
+          <div>
+            <label class="block text-[10px] text-textMuted mb-1 text-center">الحقل</label>
+            <select id="manualTargetInput" onchange="onManualTargetChange()"
+                    class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-center text-xs">
+              <option value="checkIn">الحضور</option>
+              <option value="checkOut">الانصراف</option>
+              <option value="midCheck">منتصف الدوام</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] text-textMuted mb-1 text-center">الفترة</label>
+            <select id="manualPeriodInput" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-center text-xs">
+              <option value="AM">ص</option>
+              <option value="PM">م</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] text-textMuted mb-1 text-center">الساعة</label>
+            <select id="manualHourInput" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-center text-xs"></select>
+          </div>
+          <div>
+            <label class="block text-[10px] text-textMuted mb-1 text-center">الدقيقة</label>
+            <input id="manualMinuteInput" type="number" min="0" max="59" step="1" value="0"
+                   class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-center text-xs">
+          </div>
+        </div>
+        <button onclick="saveManualTime()" class="w-full py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-cyanSecondary text-xs">
+          تأكيد التعديل
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="compact-card bg-cardBg rounded-2xl p-3 border border-slate-700/60 shadow-xl space-y-2">
+    <h3 class="text-sm font-bold"><i class="fa-solid fa-chart-line text-cyanSecondary ml-1"></i>متابعة العداد الحي</h3>
+    <div class="grid grid-cols-3 gap-1.5 text-center">
+      <div class="bg-cardBgDark p-2 rounded-lg border border-slate-800">
+        <span class="text-[9px] text-textMuted block">المنقضي</span>
+        <span id="dispElapsedTime" class="text-xs font-bold text-greenSuccess block">0 س</span>
+      </div>
+      <div class="bg-cardBgDark p-2 rounded-lg border border-slate-800">
+        <span class="text-[9px] text-textMuted block" id="remainingLabel">المتبقي</span>
+        <span id="dispRemainingTime" class="text-xs font-bold text-goldWarning block">0 س</span>
+      </div>
+      <div class="bg-cardBgDark p-2 rounded-lg border border-slate-800">
+        <span class="text-[9px] text-textMuted block" id="expectedOutLabel">الانصراف المتوقع</span>
+        <span id="dispExpectedOut" class="text-xs font-bold text-cyanSecondary block">--:--</span>
+      </div>
+    </div>
+    <div>
+      <div class="flex justify-between text-[10px] mb-1">
+        <span class="text-textMuted">نسبة الإنجاز</span>
+        <span id="progressPercentText" class="text-cyanSecondary">0%</span>
+      </div>
+      <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
+        <div id="progressBarFill" class="h-full bg-gradient-to-l from-cyanSecondary to-tealPrimary rounded-full transition-[width] duration-700 ease-linear" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="compact-card bg-cardBg rounded-2xl p-3 border border-slate-700/60 space-y-2">
+    <div class="flex items-center justify-between">
+      <h3 class="text-sm font-bold"><i class="fa-solid fa-fingerprint text-cyanSecondary ml-1"></i>بصمة المنتصف</h3>
+      <span id="midStatus" class="text-[10px] text-textMuted">بعد 4 ساعات من الحضور</span>
+    </div>
+    <div class="grid grid-cols-2 gap-1.5">
+      <div class="bg-cardBgDark p-2 rounded-lg text-center">
+        <span class="text-[9px] text-textMuted block">الموعد المتوقع</span>
+        <strong id="midExpected" class="text-cyanSecondary text-xs">--:--</strong>
+      </div>
+      <div class="bg-cardBgDark p-2 rounded-lg text-center">
+        <span class="text-[9px] text-textMuted block">البصمة الفعلية</span>
+        <strong id="midActual" class="text-greenSuccess text-xs">--:--</strong>
+      </div>
+    </div>
+    <button id="btnMidCheck" onclick="recordMidCheck()"
+            class="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold transition-opacity">
+      تسجيل بصمة المنتصف الآن
+    </button>
+  </div>
+</section>
+
+<section id="screen-reports" class="hidden compact-stack space-y-3">
+  <div class="bg-cardBg rounded-2xl p-4 border border-slate-700/60 space-y-3 no-print">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-base font-bold"><i class="fa-solid fa-file-invoice text-cyanSecondary ml-1"></i>تقارير وسجل الحضور</h2>
+        <p class="text-xs text-textMuted">تصفية حسب فترة محددة</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="exportToExcel()" class="px-3 py-2 bg-emerald-700 rounded-xl text-xs">تصدير Excel</button>
+        <button onclick="exportToPDF()" class="px-3 py-2 bg-rose-700 rounded-xl text-xs">طباعة / PDF</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div class="bg-cardBgDark p-2 rounded-xl">
+        <label class="text-xs text-cyanSecondary block mb-1">من تاريخ</label>
+        <div class="grid grid-cols-3 gap-1.5">
+          <select id="fromDay" onchange="renderReports()" class="field"></select>
+          <select id="fromMonth" onchange="onPeriodChange()" class="field"></select>
+          <select id="fromYear" onchange="onPeriodChange()" class="field"></select>
+        </div>
+      </div>
+      <div class="bg-cardBgDark p-2 rounded-xl">
+        <label class="text-xs text-cyanSecondary block mb-1">إلى تاريخ</label>
+        <div class="grid grid-cols-3 gap-1.5">
+          <select id="toDay" onchange="renderReports()" class="field"></select>
+          <select id="toMonth" onchange="onPeriodChange()" class="field"></select>
+          <select id="toYear" onchange="onPeriodChange()" class="field"></select>
+        </div>
+      </div>
+    </div>
+    <div>
+      <label class="text-xs text-textMuted block mb-1">التصنيف</label>
+      <select id="repFilterCategory" onchange="renderReports()" class="field w-full">
+        <option value="ALL">الجميع</option>
+        <option value="SUCCESS">الحضور المنتظم</option>
+        <option value="LATE">أيام التأخير</option>
+        <option value="ABSENCE">الغياب</option>
+        <option value="VACATION">الإجازات</option>
+        <option value="INCOMPLETE">السجلات الناقصة</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 print-area">
+    <div class="bg-cardBg p-3 rounded-xl border border-slate-700 text-center">
+      <span class="text-[10px] text-textMuted block">أيام الحضور</span>
+      <b id="kpiTotalDays" class="text-lg text-cyanSecondary">0</b>
+    </div>
+    <div class="bg-cardBg p-3 rounded-xl border border-slate-700 text-center">
+      <span class="text-[10px] text-textMuted block">أيام التأخير</span>
+      <b id="kpiLateDays" class="text-lg text-goldWarning">0</b>
+    </div>
+    <div class="bg-cardBg p-3 rounded-xl border border-slate-700 text-center">
+      <span class="text-[10px] text-textMuted block">إجمالي التأخير</span>
+      <b id="kpiTotalLateMin" class="text-lg text-rose-400">0 د</b>
+    </div>
+    <div class="bg-cardBg p-3 rounded-xl border border-slate-700 text-center">
+      <span class="text-[10px] text-textMuted block">ساعات العمل</span>
+      <b id="kpiTotalWorkHours" class="text-lg text-greenSuccess">0 س</b>
+    </div>
+  </div>
+
+  <div class="bg-cardBg rounded-2xl p-4 border border-slate-700 space-y-2 print-area">
+    <h3 class="font-bold text-sm">الملخص الشهري للفترة</h3>
+    <div id="monthlySummary" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm"></div>
+  </div>
+
+  <div class="bg-cardBg rounded-2xl border border-slate-700 overflow-hidden print-area">
+    <div class="px-3 py-2 border-b border-slate-800 flex justify-between">
+      <h3 class="font-bold text-xs">تفاصيل السجلات</h3>
+      <span id="repRecordCount" class="text-[10px] text-textMuted">0 سجل</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-right text-xs print-table">
+        <thead class="bg-cardBgDark text-textMuted">
+          <tr>
+            <th class="p-2">التاريخ</th>
+            <th class="p-2">الحضور</th>
+            <th class="p-2">منتصف الدوام</th>
+            <th class="p-2">الانصراف</th>
+            <th class="p-2">مدة العمل</th>
+            <th class="p-2">التأخير</th>
+            <th class="p-2">الحالة</th>
+            <th class="p-2 no-print">إجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="reportsTableBody" class="divide-y divide-slate-800"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="bg-cardBg rounded-2xl p-3 border border-slate-700 space-y-2 no-print">
+    <div>
+      <h3 class="font-bold text-sm">الأيام الناقصة للمراجعة</h3>
+      <p class="text-[10px] text-textMuted">اليوم بدون تسجيل يظهر هنا، ولا يُعتمد غياباً تلقائياً.</p>
+    </div>
+    <div id="missingDaysList" class="space-y-2"></div>
+  </div>
+
+  <div class="bg-cardBg rounded-2xl p-3 border border-slate-700 space-y-2 no-print">
+    <h3 class="font-bold text-sm">سجل التعديلات اليدوية</h3>
+    <div id="auditLogList" class="space-y-1 text-[10px] text-textMuted"></div>
+  </div>
+</section>
+
+<section id="screen-settings" class="hidden compact-stack space-y-3">
+  <div class="bg-cardBg rounded-2xl p-4 border border-slate-700 space-y-3">
+    <h2 class="text-base font-bold">إعدادات الدوام الرسمية</h2>
+    <div class="grid sm:grid-cols-2 gap-2">
+      <div>
+        <label class="text-xs text-textMuted block mb-1">بداية الدوام</label>
+        <input type="time" id="setOfficialStart" class="field w-full">
+      </div>
+      <div>
+        <label class="text-xs text-textMuted block mb-1">فترة السماح (دقائق)</label>
+        <input type="number" id="setGracePeriod" min="0" max="60" class="field w-full">
+      </div>
+    </div>
+  </div>
+  <div class="bg-cardBg rounded-2xl p-4 border border-slate-700 space-y-3">
+    <h3 class="font-bold text-sm">ساعات الدوام الأسبوعية</h3>
+    <div id="weeklyScheduleContainer" class="space-y-1.5"></div>
+    <button onclick="saveShiftSettings()" class="w-full py-2.5 bg-tealPrimary rounded-xl font-bold text-sm">حفظ إعدادات الدوام</button>
+  </div>
+  <div class="bg-cardBg rounded-2xl p-4 border border-slate-700 space-y-2">
+    <h3 class="font-bold text-sm">النسخ الاحتياطي والاستعادة</h3>
+    <p class="text-[10px] text-textMuted">احتفظ بنسخة JSON دورية لحماية سجلاتك.</p>
+    <div class="grid sm:grid-cols-2 gap-2">
+      <button onclick="exportBackupJSON()" class="p-2.5 bg-slate-800 rounded-xl text-cyanSecondary text-sm">تنزيل نسخة احتياطية</button>
+      <label class="p-2.5 bg-slate-800 rounded-xl text-goldWarning text-center cursor-pointer text-sm">
+        استعادة نسخة
+        <input type="file" id="backupFileInput" accept=".json" onchange="importBackupJSON(event)" class="hidden">
+      </label>
+    </div>
+    <p id="backupReminderText" class="text-[10px] text-textMuted"></p>
+  </div>
+  <div class="bg-cardBg rounded-2xl p-4 border border-rose-900/60 space-y-2">
+    <h3 class="font-bold text-sm text-rose-400">منطقة الخطر</h3>
+    <p class="text-[10px] text-textMuted">إعادة تعيين كاملة ستحذف كل السجلات والإعدادات.</p>
+    <button onclick="resetAllData()" class="w-full py-2.5 bg-rose-900/60 hover:bg-rose-800 rounded-xl text-white text-sm font-bold">إعادة تعيين كل البيانات</button>
+  </div>
+</section>
+
+</main>
+
+<nav class="no-print bg-cardBgDark border-t border-slate-800 fixed bottom-0 left-0 right-0 z-40">
+  <div class="max-w-md mx-auto flex justify-around">
+    <button onclick="switchTab('main')" id="tab-main" class="tab-btn active flex-1 py-2 flex flex-col items-center gap-0.5 text-[10px] text-textMuted">
+      <i class="fa-solid fa-house text-base"></i><span>الرئيسية</span>
+    </button>
+    <button onclick="switchTab('reports')" id="tab-reports" class="tab-btn flex-1 py-2 flex flex-col items-center gap-0.5 text-[10px] text-textMuted">
+      <i class="fa-solid fa-chart-pie text-base"></i><span>التقارير</span>
+    </button>
+    <button onclick="switchTab('settings')" id="tab-settings" class="tab-btn flex-1 py-2 flex flex-col items-center gap-0.5 text-[10px] text-textMuted">
+      <i class="fa-solid fa-gear text-base"></i><span>الإعدادات</span>
+    </button>
+  </div>
+</nav>
+
+<div id="recordModal" class="hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 no-print">
+  <div class="bg-cardBg border border-slate-600 rounded-2xl p-4 w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-3">
+    <div class="flex justify-between items-center">
+      <h3 id="recordModalTitle" class="font-bold text-base">تعديل السجل</h3>
+      <button onclick="closeRecordModal()" class="text-xl text-textMuted w-8 h-8 flex items-center justify-center">×</button>
+    </div>
+    <input id="editOriginalDate" type="hidden">
+    <div>
+      <label class="text-xs text-textMuted block mb-1">تاريخ السجل</label>
+      <input id="editDate" type="date" class="field w-full">
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div>
+        <label class="text-xs text-textMuted block mb-1">الحضور</label>
+        <input id="editCheckIn" type="time" class="field w-full">
+      </div>
+      <div>
+        <label class="text-xs text-textMuted block mb-1">منتصف الدوام</label>
+        <input id="editMidCheck" type="time" class="field w-full">
+      </div>
+      <div>
+        <label class="text-xs text-textMuted block mb-1">الانصراف</label>
+        <input id="editCheckOut" type="time" class="field w-full">
+      </div>
+    </div>
+    <div>
+      <label class="text-xs text-textMuted block mb-1">حالة اليوم</label>
+      <select id="editDayStatus" class="field w-full">
+        <option value="WORK">دوام مسجل</option>
+        <option value="ABSENCE">غياب</option>
+        <option value="VACATION">إجازة</option>
+        <option value="INCOMPLETE">ناقص للمراجعة</option>
+      </select>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="saveRecordEdit()" class="flex-1 bg-tealPrimary p-2.5 rounded-xl font-bold text-sm">حفظ التعديلات</button>
+      <button onclick="closeRecordModal()" class="px-4 bg-slate-700 rounded-xl text-sm">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+if (typeof structuredClone === 'undefined') {
+    window.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
+}
+
+const DEFAULT_SETTINGS={
+  officialStart:'07:00',
+  gracePeriod:10,
+  weeklySchedule:{
+    0:{name:'الأحد',hours:8.5,enabled:true},
+    1:{name:'الإثنين',hours:8.5,enabled:true},
+    2:{name:'الثلاثاء',hours:8.5,enabled:true},
+    3:{name:'الأربعاء',hours:8.5,enabled:true},
+    4:{name:'الخميس',hours:8.5,enabled:true},
+    5:{name:'الجمعة',hours:8,enabled:false},
+    6:{name:'السبت',hours:8,enabled:true}
+  }
+};
+const MAX_LATE_MINUTES=480;
+const MAX_REASONABLE_SHIFT=18*60;
+
+let settings=structuredClone(DEFAULT_SETTINGS);
+let records={};
+let auditLog=[];
+let lastMainActionAt=0;
+let lastKnownDay='';
+let midCheckNotifiedFor='';
+let shiftEndNotifiedFor='';
+const $=id=>document.getElementById(id);
+
+function scheduleAndroidAlarms(checkInTime, shiftHours) {
+    if (window.AndroidAlarm && typeof window.AndroidAlarm.setShiftAlarms === 'function') {
+        try {
+            const h = Number.isFinite(+shiftHours) ? +shiftHours : 8.5;
+            window.AndroidAlarm.setShiftAlarms(checkInTime, h);
+        } catch (e) {
+            console.error("Failed to schedule native alarms:", e);
+        }
+    }
+}
+
+function cancelAndroidAlarms() {
+    if (window.AndroidAlarm && typeof window.AndroidAlarm.cancelAlarms === 'function') {
+        try {
+            window.AndroidAlarm.cancelAlarms();
+        } catch (e) {
+            console.error("Failed to cancel native alarms:", e);
+        }
+    }
+}
+
+function todayKey(){
+  const n=new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+}
+function keyFor(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function format12Hour(v){
+  if(!v)return'--:--';
+  const parts=v.split(':');
+  if(parts.length<2)return'--:--';
+  const h=Number(parts[0]),m=Number(parts[1]);
+  if(!Number.isFinite(h)||!Number.isFinite(m))return'--:--';
+  return `${String(h%12||12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${h>=12?'م':'ص'}`;
+}
+function formatArabicDate(s){
+  const [y,m,d]=s.split('-').map(Number);
+  return new Date(y,m-1,d).toLocaleDateString('ar-EG',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
+}
+function getCurrentTimeFormatted(){
+  const n=new Date();
+  return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+}
+function calculateLateMinutes(checkIn,official=settings.officialStart,grace=settings.gracePeriod){
+  if(!checkIn)return 0;
+  const [h,m]=checkIn.split(':').map(Number);
+  const [oh,om]=official.split(':').map(Number);
+  const raw=Math.max(0,(h*60+m)-(oh*60+om)-Number(grace||0));
+  return Math.min(raw,MAX_LATE_MINUTES);
+}
+function calcLateSmart(checkIn,dateKey){
+  const d=dateKey?new Date(dateKey+'T12:00:00'):new Date();
+  const cfg=settings.weeklySchedule[d.getDay()];
+  if(!cfg||cfg.enabled===false)return 0;
+  return calculateLateMinutes(checkIn);
+}
+function fmtDuration(ms){
+  if(ms<60000)return '< دقيقة';
+  const totalMin=Math.floor(ms/60000);
+  const hh=Math.floor(totalMin/60);
+  const mm=totalMin%60;
+  if(hh===0)return `${mm} د`;
+  if(mm===0)return `${hh} س`;
+  return `${hh} س ${mm} د`;
+}
+function mergeSchedule(saved){
+  const def=DEFAULT_SETTINGS.weeklySchedule;
+  const out={};
+  Object.keys(def).forEach(i=>{
+    out[i]={...def[i],...(saved&&saved[i]?saved[i]:{})};
+  });
+  return out;
+}
+function findOpenRecord(){
+  const today=todayKey();
+  const y=new Date();y.setDate(y.getDate()-1);
+  const yesterday=keyFor(y);
+  if(records[today]?.checkIn&&!records[today]?.checkOut){
+    return {k:today,r:records[today],isOpen:true};
+  }
+  if(records[yesterday]?.checkIn&&!records[yesterday]?.checkOut){
+    return {k:yesterday,r:records[yesterday],isOpen:true};
+  }
+  return {k:today,r:records[today],isOpen:false};
+}
+function computeDiff(checkIn,checkOut){
+  if(!checkIn||!checkOut)return null;
+  const [ih,im]=checkIn.split(':').map(Number);
+  const [oh,om]=checkOut.split(':').map(Number);
+  let d=oh*60+om-(ih*60+im);
+  if(d<0)d+=1440;
+  if(d>MAX_REASONABLE_SHIFT)return null;
+  return d;
+}
+function logEdit(action,date,details=''){
+  auditLog.unshift({at:new Date().toISOString(),action,date,details});
+  auditLog=auditLog.slice(0,200);
+}
+function showToast(msg,type='info'){
+  const t=$('toastContent');
+  t.className='px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold border bg-slate-900 '+
+    (type==='success'?'text-greenSuccess border-green-700':
+     type==='error'?'text-rose-400 border-rose-700':
+     'text-cyanSecondary border-cyan-700');
+  t.textContent=msg;
+  $('toast').classList.remove('hidden');
+  clearTimeout(window.toastTimer);
+  window.toastTimer=setTimeout(()=>$('toast').classList.add('hidden'),3500);
+}
+
+window.onload=()=>{
+  loadStorage();
+  buildManualHourOptions();
+  initSettingsUI();
+  initReportDateSelectors();
+  updateLiveClock();
+  lastKnownDay=todayKey();
+  setInterval(updateLiveClock,1000);
+  setInterval(updateLiveShiftProgress,1000);
+  setInterval(watchDayChange,30000);
+  setInterval(checkOpenAlerts,60000);
+  renderMainScreen();
+  checkOpenAlerts();
+  updateBackupReminder();
+  updateTitleStatus();
+
+  const openRec = findOpenRecord();
+  if(openRec.r && openRec.r.checkIn && !openRec.r.checkOut){
+    const recDate = new Date(openRec.k + 'T12:00:00');
+    const cfg = settings.weeklySchedule[recDate.getDay()] || {hours: 8.5};
+    scheduleAndroidAlarms(openRec.r.checkIn, cfg.hours);
+  }
+};
+function buildManualHourOptions(){
+  const sel=$('manualHourInput');
+  sel.innerHTML='';
+  for(let i=1;i<=12;i++){
+    sel.add(new Option(String(i).padStart(2,'0'),i));
+  }
+  sel.value=8;
+}
+function buildMonthOptions(){
+  const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  ['fromMonth','toMonth'].forEach(id=>{
+    const sel=$(id);sel.innerHTML='';
+    months.forEach((n,i)=>sel.add(new Option(n,i+1)));
+  });
+}
+
+function loadStorage(){
+  try{
+    const s=JSON.parse(localStorage.getItem('shift_bot_settings')||'null');
+    if(s)settings={
+      ...structuredClone(DEFAULT_SETTINGS),
+      ...s,
+      weeklySchedule:mergeSchedule(s.weeklySchedule)
+    };
+  }catch(e){console.warn('settings load failed',e)}
+  try{records=JSON.parse(localStorage.getItem('shift_bot_records')||'{}')||{}}catch(e){records={}}
+  try{auditLog=JSON.parse(localStorage.getItem('shift_bot_audit')||'[]')||[]}catch(e){auditLog=[]}
+  Object.keys(records).forEach(k=>{
+    const r=records[k];
+    if(r.midCheck===undefined)r.midCheck=null;
+    if(r.lateMinutes===undefined)r.lateMinutes=0;
+    if(!r.dayStatus)r.dayStatus=(r.status==='ABSENCE'||r.status==='VACATION'||r.status==='INCOMPLETE')?r.status:'WORK';
+  });
+}
+function saveStorage(){
+  try{
+    localStorage.setItem('shift_bot_settings',JSON.stringify(settings));
+    localStorage.setItem('shift_bot_records',JSON.stringify(records));
+    localStorage.setItem('shift_bot_audit',JSON.stringify(auditLog));
+    return true;
+  }catch(e){
+    console.error('save failed',e);
+    showToast('⚠️ تعذر الحفظ! المساحة ممتلئة. أنشئ نسخة احتياطية فوراً.','error');
+    return false;
+  }
+}
+
+function updateLiveClock(){
+  const n=new Date();
+  const time=n.toLocaleTimeString('en-US',{hour12:true,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const date=n.toLocaleDateString('ar-EG',{weekday:'short',day:'numeric',month:'short'});
+  $('liveTimeHeader').textContent=time;
+  $('liveDateHeader').textContent=date;
+}
+function updateTitleStatus(){
+  const today=todayKey();
+  const r=records[today];
+  const y=new Date();y.setDate(y.getDate()-1);
+  const pr=records[keyFor(y)];
+
+  if(r){
+    if(r.dayStatus==='ABSENCE'){document.title='⚫ غياب — شِفت بصمة';return}
+    if(r.dayStatus==='VACATION'){document.title='🔵 إجازة — شِفت بصمة';return}
+    if(r.checkIn&&!r.checkOut){document.title='🟢 مسجل — شِفت بصمة';return}
+    if(r.checkIn&&r.checkOut){document.title='✅ مكتمل — شِفت بصمة';return}
+  }
+  if(pr&&pr.checkIn&&!pr.checkOut){document.title='🟡 شفت مفتوح — شِفت بصمة';return}
+  document.title='🔴 لم تسجل — شِفت بصمة';
+}
+function watchDayChange(){
+  const k=todayKey();
+  if(k!==lastKnownDay){
+    lastKnownDay=k;
+    midCheckNotifiedFor='';
+    shiftEndNotifiedFor='';
+    renderMainScreen();
+    if(!$('screen-reports').classList.contains('hidden'))renderReports();
+    updateTitleStatus();
+    checkOpenAlerts();
+  }
+}
+
+function switchTab(t){
+  ['main','reports','settings'].forEach(x=>{
+    $('screen-'+x).classList.toggle('hidden',x!==t);
+    $('tab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='main')renderMainScreen();
+  if(t==='reports')renderReports();
+  window.scrollTo(0,0);
+}
+
+function renderMainScreen(){
+  const {k,r}=findOpenRecord();
+  const cfg=settings.weeklySchedule[new Date().getDay()]||{hours:8.5,enabled:true};
+  const recDate=k?new Date(k+'T12:00:00'):new Date();
+  const recCfg=settings.weeklySchedule[recDate.getDay()]||cfg;
+
+  $('dispOfficialStart').textContent=format12Hour(settings.officialStart);
+  $('dispShiftHours').textContent=(recCfg.hours||8.5)+' س';
+
+  let disabled=false;
+  if(r&&['ABSENCE','VACATION'].includes(r.dayStatus))disabled=true;
+  else if(r&&r.checkIn&&r.checkOut)disabled=true;
+
+  $('btnMainAction').disabled=disabled;
+  $('btnMainAction').classList.toggle('opacity-50',disabled);
+  $('btnMainAction').classList.toggle('cursor-not-allowed',disabled);
+
+  if(!r||!r.checkIn){
+    $('dispActualIn').textContent='--:--';
+    $('dispActualOut').textContent='--:--';
+    if(cfg.enabled===false){
+      $('btnActionText').textContent='يوم غير مقرر';
+      $('btnActionIcon').className='fa-solid fa-moon text-xl text-textMuted';
+      $('todayStatusBadge').textContent='راحة';
+    }else{
+      $('btnActionText').textContent='تسجيل الحضور الآن';
+      $('btnActionIcon').className='fa-solid fa-fingerprint text-xl text-cyanSecondary';
+      $('todayStatusBadge').textContent='لم يتم التسجيل بعد';
+    }
+  }else{
+    $('dispActualIn').textContent=format12Hour(r.checkIn);
+    $('dispActualOut').textContent=format12Hour(r.checkOut);
+
+    if(disabled){
+      if(r.dayStatus==='ABSENCE'||r.dayStatus==='VACATION'){
+        $('btnActionText').textContent='اليوم مُعتمد '+(r.dayStatus==='ABSENCE'?'غياب':'إجازة');
+        $('btnActionIcon').className='fa-solid fa-calendar-check text-xl text-goldWarning';
+        $('todayStatusBadge').textContent=r.dayStatus==='ABSENCE'?'غياب معتمد':'إجازة معتمدة';
+      }else{
+        $('btnActionText').textContent='اكتمل دوام اليوم';
+        $('btnActionIcon').className='fa-solid fa-circle-check text-xl text-greenSuccess';
+        $('todayStatusBadge').textContent=(Number(r.lateMinutes)||0)>0?`مكتمل (متأخر ${r.lateMinutes} د)`:'مكتمل';
+      }
+    }else{
+      $('btnActionText').textContent='تسجيل الانصراف الآن';
+      $('btnActionIcon').className='fa-solid fa-right-from-bracket text-xl text-goldWarning';
+      $('todayStatusBadge').textContent=(Number(r.lateMinutes)||0)>0?`متأخر ${r.lateMinutes} د`:'قيد الدوام';
+    }
+  }
+
+  updateLiveShiftProgress();
+  updateTitleStatus();
+}
+
+function toggleManualAdjustment(){
+  $('manualTimeBox').classList.toggle('hidden');
+  $('manualChevron').classList.toggle('rotate-180');
+  if(!$('manualTimeBox').classList.contains('hidden'))onManualTargetChange();
+}
+function onManualTargetChange(){
+  const target=$('manualTargetInput').value;
+  const {r}=findOpenRecord();
+  const v=r?.[target]||getCurrentTimeFormatted();
+  setSeparateTimeInputs(v);
+}
+function setSeparateTimeInputs(v){
+  if(!v)return;
+  const parts=v.split(':');
+  if(parts.length<2)return;
+  const h=Number(parts[0]),m=Number(parts[1]);
+  if(!Number.isFinite(h)||!Number.isFinite(m))return;
+  $('manualHourInput').value=h%12||12;
+  $('manualMinuteInput').value=String(m).padStart(2,'0');
+  $('manualPeriodInput').value=h>=12?'PM':'AM';
+}
+function get24HourFromSeparateInputs(){
+  let h=Number($('manualHourInput').value);
+  let m=Number($('manualMinuteInput').value);
+  if(!Number.isFinite(m)||m<0||m>59||Math.floor(m)!==m){
+    showToast('الدقائق لازم تكون رقماً صحيحاً من 0 إلى 59','error');
+    return null;
+  }
+  if($('manualPeriodInput').value==='PM'&&h<12)h+=12;
+  if($('manualPeriodInput').value==='AM'&&h===12)h=0;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function saveManualTime(){
+  const v=get24HourFromSeparateInputs();
+  if(!v)return;
+  const target=$('manualTargetInput').value;
+  const {k,r:existing}=findOpenRecord();
+  const r=existing||{checkIn:null,checkOut:null,midCheck:null,dayStatus:'WORK',lateMinutes:0};
+
+  const tempR={...r,[target]:v};
+
+  if(target==='checkOut'&&tempR.checkIn&&tempR.checkOut){
+    const [ih,im]=tempR.checkIn.split(':').map(Number);
+    const [oh,om]=tempR.checkOut.split(':').map(Number);
+    let diff=oh*60+om-(ih*60+im);
+    if(diff<0)diff+=1440;
+    if(diff>MAX_REASONABLE_SHIFT){
+      if(!confirm(`المدة المحسوبة ${Math.floor(diff/60)} ساعة، غير طبيعي. متابعة؟`))return;
+    }
+    if(diff<5){
+      if(!confirm('الانصراف خلال أقل من 5 دقائق. متابعة؟'))return;
+    }
+  }
+
+  if(target==='checkIn'){
+    const checkDate=new Date(k+'T'+v+':00');
+    if(checkDate.getTime()>Date.now()+3600000){
+      if(!confirm('وقت الحضور في المستقبل. متابعة؟'))return;
+    }
+  }
+
+  r[target]=v;
+
+  if(r.checkIn&&r.checkOut){
+    r.lateMinutes=calcLateSmart(r.checkIn,k);
+    r.status=(Number(r.lateMinutes)||0)>0?'LATE':'SUCCESS';
+    r.dayStatus='WORK';
+    cancelAndroidAlarms();
+  }else if(r.checkIn||r.checkOut){
+    r.lateMinutes=r.checkIn?calcLateSmart(r.checkIn,k):0;
+    r.status='INCOMPLETE';
+    if(r.dayStatus==='WORK')r.dayStatus='INCOMPLETE';
+    if(r.checkIn) {
+      const recDate=new Date(k+'T12:00:00');
+      const cfg=settings.weeklySchedule[recDate.getDay()]||{hours:8.5};
+      scheduleAndroidAlarms(r.checkIn, cfg.hours);
+    }
+  }
+  records[k]=r;
+  const label={checkIn:'تعديل يدوي للحضور',checkOut:'تعديل يدوي للانصراف',midCheck:'تعديل يدوي لبصمة المنتصف'}[target];
+  logEdit(label,k,v);
+  saveStorage();
+  renderMainScreen();
+  checkOpenAlerts();
+  showToast('تم حفظ التعديل','success');
+}
+
+function handleMainAction(){
+  const clickNow=Date.now();
+  if(clickNow-lastMainActionAt<1800){showToast('تم تجاهل الضغط المكرر.');return}
+
+  const {k,r:existing}=findOpenRecord();
+  let r=existing;
+
+  if(r&&['ABSENCE','VACATION'].includes(r.dayStatus)){
+    showToast('اليوم معتمد غياباً أو إجازة. عدّل السجل من التقارير.');
+    lastMainActionAt=clickNow;
+    return;
+  }
+  const time=getCurrentTimeFormatted();
+
+  if(!r||!r.checkIn){
+    const late=calcLateSmart(time,k);
+    records[k]={
+      ...(r||{}),
+      checkIn:time,
+      checkOut:null,
+      midCheck:r?.midCheck||null,
+      lateMinutes:late,
+      status:late?'LATE':'SUCCESS',
+      dayStatus:'WORK'
+    };
+    logEdit('تسجيل حضور',k,time);
+    saveStorage();
+
+    const recDate=new Date(k+'T12:00:00');
+    const cfg=settings.weeklySchedule[recDate.getDay()]||{hours:8.5};
+    scheduleAndroidAlarms(time, cfg.hours);
+
+    showToast('تم تسجيل الحضور'+(late?` (متأخر ${late} د)`:''),'success');
+    lastMainActionAt=clickNow;
+  }else if(!r.checkOut){
+    const [ih,im]=r.checkIn.split(':').map(Number);
+    const [oh,om]=time.split(':').map(Number);
+    let diff=oh*60+om-(ih*60+im);
+    if(diff<0)diff+=1440;
+    if(diff>MAX_REASONABLE_SHIFT){
+      if(!confirm(`المدة المحسوبة ${Math.floor(diff/60)} ساعة، وهذا غير طبيعي. هل تريد المتابعة؟`))return;
+    }
+    if(diff<5){
+      if(!confirm('الانصراف بعد الحضور بأقل من 5 دقائق. متأكد؟'))return;
+    }
+    r.checkOut=time;
+    r.dayStatus='WORK';
+    r.status=(Number(r.lateMinutes)||0)>0?'LATE':'SUCCESS';
+    logEdit('تسجيل انصراف',k,time);
+    saveStorage();
+
+    cancelAndroidAlarms();
+
+    showToast('تم تسجيل الانصراف','success');
+    lastMainActionAt=clickNow;
+  }else{
+    showToast('الحضور والانصراف مسجلان بالفعل.');
+    lastMainActionAt=clickNow;
+    return;
+  }
+
+  renderMainScreen();
+  checkOpenAlerts();
+}
+
+function recordMidCheck(){
+  const {k,r}=findOpenRecord();
+  if(!r||!r.checkIn){showToast('سجّل الحضور أولاً');return}
+  if(r.midCheck){showToast('بصمة المنتصف مسجلة بالفعل.');return}
+  if(r.checkOut){showToast('الشفت مغلق. عدّل يدوياً من التقارير.');return}
+  r.midCheck=getCurrentTimeFormatted();
+  logEdit('بصمة المنتصف',k,r.midCheck);
+  saveStorage();
+  renderMainScreen();
+  showToast('تم تسجيل بصمة المنتصف','success');
+}
+function renderMidCheck(){
+  const {k,r}=findOpenRecord();
+  if(!r||!r.checkIn){
+    $('midExpected').textContent='--:--';
+    $('midActual').textContent='--:--';
+    $('midStatus').textContent='بعد 4 ساعات من الحضور';
+    $('btnMidCheck').disabled=true;
+    $('btnMidCheck').classList.add('opacity-50','cursor-not-allowed');
+    return;
+  }
+  const [h,m]=r.checkIn.split(':').map(Number);
+  const recDate=new Date(k+'T12:00:00');
+  const due=new Date(recDate);
+  due.setHours(h,m+240,0,0);
+
+  const exp=`${String(due.getHours()).padStart(2,'0')}:${String(due.getMinutes()).padStart(2,'0')}`;
+  $('midExpected').textContent=format12Hour(exp);
+  $('midActual').textContent=format12Hour(r.midCheck);
+  $('btnMidCheck').disabled=!!r.midCheck||!!r.checkOut;
+  $('btnMidCheck').classList.toggle('opacity-50',!!r.midCheck||!!r.checkOut);
+  $('btnMidCheck').classList.toggle('cursor-not-allowed',!!r.midCheck||!!r.checkOut);
+
+  const now=Date.now();
+  if(r.midCheck){
+    $('midStatus').textContent='✅ تم تسجيل البصمة';
+  }else if(r.checkOut){
+    $('midStatus').textContent='انتهى الشفت بدون بصمة منتصف';
+  }else if(now>=due.getTime()){
+    $('midStatus').textContent='⚠️ فات موعدها';
+    if(midCheckNotifiedFor!==k){
+      midCheckNotifiedFor=k;
+      sendNotification('بصمة منتصف الدوام','فات موعد البصمة، سجّلها الآن');
+    }
+  }else{
+    $('midStatus').textContent='موعدها بعد 4 ساعات من الحضور';
+  }
+}
+
+function updateLiveShiftProgress(){
+  const {k,r}=findOpenRecord();
+  const now=new Date();
+  const recDate=k?new Date(k+'T12:00:00'):now;
+  const cfg=settings.weeklySchedule[recDate.getDay()]||{hours:8.5};
+
+  renderMidCheck();
+
+  const setRem=(txt,color)=>{
+    const el=$('dispRemainingTime');
+    el.className='text-xs font-bold block '+color;
+    el.textContent=txt;
+  };
+
+  if(!r||!r.checkIn){
+    $('dispElapsedTime').textContent='0 س';
+    setRem('0 س','text-goldWarning');
+    $('dispExpectedOut').textContent='--:--';
+    $('dispExpectedOut').className='text-xs font-bold text-cyanSecondary block';
+    $('expectedOutLabel').textContent='الانصراف المتوقع';
+    $('progressBarFill').style.width='0%';
+    $('progressPercentText').textContent='0%';
+    return;
+  }
+
+  const [h,m]=r.checkIn.split(':').map(Number);
+  const start=new Date(recDate);
+  start.setHours(h,m,0,0);
+
+  if(start.getTime()>now.getTime()+60000){
+    $('dispElapsedTime').textContent='0 س';
+    setRem('مستقبلي','text-textMuted');
+    $('dispExpectedOut').textContent='--:--';
+    $('progressBarFill').style.width='0%';
+    $('progressPercentText').textContent='--';
+    return;
+  }
+
+  const shiftMs=Number(cfg.hours||8.5)*3600000;
+  const expectedEnd=new Date(start.getTime()+shiftMs);
+
+  let ref=now;
+  let isCheckedOut=false;
+
+  if(r.checkOut){
+    const [oh,om]=r.checkOut.split(':').map(Number);
+    const outDate=new Date(recDate);
+    outDate.setHours(oh,om,0,0);
+    if(outDate<start)outDate.setDate(outDate.getDate()+1);
+    ref=outDate;
+    isCheckedOut=true;
+  }
+
+  const elapsed=Math.max(0,ref-start);
+  $('dispElapsedTime').textContent=fmtDuration(elapsed);
+
+  if(isCheckedOut){
+    const diff=elapsed-shiftMs;
+    if(diff>60000){
+      setRem('+'+fmtDuration(diff)+' إضافي','text-goldWarning');
+    }else if(diff<-60000){
+      setRem(fmtDuration(-diff)+' ناقص','text-rose-400');
+    }else{
+      setRem('مطابق','text-greenSuccess');
+    }
+    $('dispExpectedOut').textContent=format12Hour(r.checkOut);
+    $('dispExpectedOut').className='text-xs font-bold text-greenSuccess block';
+    $('expectedOutLabel').textContent='الانصراف';
+
+    const pct=Math.min(100,elapsed/shiftMs*100);
+    $('progressBarFill').style.width=pct+'%';
+
+    if(diff>60000){
+      $('progressPercentText').textContent=`+${Math.round(diff/60000)} د إضافي`;
+    }else if(diff<-60000){
+      $('progressPercentText').textContent=`انصراف مبكر (${Math.round(pct)}%)`;
+    }else{
+      $('progressPercentText').textContent='مكتمل';
+    }
+  }else{
+    const remaining=Math.max(0,expectedEnd-now);
+    setRem(fmtDuration(remaining),'text-goldWarning');
+    $('dispExpectedOut').textContent=format12Hour(
+      `${String(expectedEnd.getHours()).padStart(2,'0')}:${String(expectedEnd.getMinutes()).padStart(2,'0')}`
+    );
+    $('dispExpectedOut').className='text-xs font-bold text-cyanSecondary block';
+    $('expectedOutLabel').textContent='الانصراف المتوقع';
+
+    const pct=Math.max(0,Math.min(100,elapsed/shiftMs*100));
+    $('progressBarFill').style.width=pct+'%';
+    $('progressPercentText').textContent=Math.round(pct)+'%';
+
+    if(remaining===0&&shiftEndNotifiedFor!==k){
+      shiftEndNotifiedFor=k;
+      sendNotification('انتهى الشفت','حان وقت تسجيل الانصراف');
+    }
+  }
+}
+
+function sendNotification(title, body){
+  if(window.AndroidAlarm && typeof window.AndroidAlarm.notify === 'function'){
+    try { window.AndroidAlarm.notify(title, body); return; } catch(e){}
+  }
+  if('Notification' in window && Notification.permission === 'granted'){
+    try { new Notification(title, { body }); } catch(e){}
+  }
+  if(navigator.vibrate) navigator.vibrate(200);
+}
+
+function daysInMonth(y,m){return new Date(y,m,0).getDate()}
+function refreshDayOptions(){
+  ['from','to'].forEach(p=>{
+    const y=+$(p+'Year').value,m=+$(p+'Month').value,n=daysInMonth(y,m),sel=$(p+'Day'),old=+sel.value||n;
+    sel.innerHTML='';
+    for(let d=1;d<=n;d++)sel.add(new Option(String(d).padStart(2,'0'),d));
+    sel.value=Math.min(old,n);
+  });
+}
+function onPeriodChange(){refreshDayOptions();renderReports()}
+function initReportDateSelectors(){
+  buildMonthOptions();
+  const n=new Date(),y=n.getFullYear(),m=n.getMonth()+1;
+  ['fromYear','toYear'].forEach(id=>{for(let yr=y-3;yr<=y+3;yr++)$(id).add(new Option(yr,yr))});
+  $('fromMonth').value=m;$('toMonth').value=m;
+  $('fromYear').value=y;$('toYear').value=y;
+  refreshDayOptions();
+  $('fromDay').value=1;$('toDay').value=daysInMonth(y,m);
+}
+function getReportDateRange(){
+  const val=p=>`${$(p+'Year').value}-${String($(p+'Month').value).padStart(2,'0')}-${String($(p+'Day').value).padStart(2,'0')}`;
+  return{startDate:val('from'),endDate:val('to')};
+}
+function duration(rec){
+  return computeDiff(rec.checkIn,rec.checkOut);
+}
+function statusLabel(r){
+  if(r.dayStatus==='ABSENCE')return'غياب';
+  if(r.dayStatus==='VACATION')return'إجازة';
+  if(!r.checkIn||!r.checkOut)return'ناقص';
+  return (Number(r.lateMinutes)||0)>0?`تأخير ${r.lateMinutes} د`:'حضور منتظم';
+}
+function renderReports(){
+  if(!$('fromYear')||!$('repFilterCategory'))return;
+  const range=getReportDateRange(),filter=$('repFilterCategory').value;
+  const tbody=$('reportsTableBody');
+  tbody.innerHTML='';
+  let present=0,lateDays=0,lateMins=0,workMins=0,abs=0,vac=0,incomplete=0;
+
+  Object.keys(records).sort().reverse().forEach(k=>{
+    if(k<range.startDate||k>range.endDate)return;
+    const r=records[k];
+    const d=duration(r);
+
+    if(r.dayStatus==='ABSENCE')abs++;
+    else if(r.dayStatus==='VACATION')vac++;
+    else if(!r.checkIn||!r.checkOut)incomplete++;
+    else present++;
+
+    if(r.dayStatus==='WORK'||!r.dayStatus){
+      if(Number(r.lateMinutes||0)>0){lateDays++;lateMins+=Number(r.lateMinutes||0)}
+      if(d!==null)workMins+=d;
+    }
+
+    const type=r.dayStatus==='ABSENCE'?'ABSENCE':
+               r.dayStatus==='VACATION'?'VACATION':
+               (!r.checkIn||!r.checkOut)?'INCOMPLETE':
+               Number(r.lateMinutes||0)>0?'LATE':'SUCCESS';
+    if(filter!=='ALL'&&filter!==type)return;
+
+    const tr=document.createElement('tr');
+    tr.className='hover:bg-slate-800/40';
+    tr.innerHTML=`
+      <td class="p-2 font-mono">${formatArabicDate(k)}</td>
+      <td class="p-2 text-greenSuccess">${format12Hour(r.checkIn)}</td>
+      <td class="p-2 text-cyanSecondary">${format12Hour(r.midCheck)}</td>
+      <td class="p-2">${format12Hour(r.checkOut)}</td>
+      <td class="p-2">${d===null?'--':`${Math.floor(d/60)} س ${d%60} د`}</td>
+      <td class="p-2 text-goldWarning">${Number(r.lateMinutes||0)>0?r.lateMinutes+' د':'—'}</td>
+      <td class="p-2">${statusLabel(r)}</td>
+      <td class="p-2 no-print">
+        <div class="flex gap-1">
+          <button onclick="openRecordModal('${k}')" class="px-2 py-1 rounded bg-sky-800 text-[10px]">تعديل</button>
+          <button onclick="deleteRecord('${k}')" class="px-2 py-1 rounded bg-rose-800 text-[10px]">حذف</button>
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+
+  $('kpiTotalDays').textContent=present;
+  $('kpiLateDays').textContent=lateDays;
+  $('kpiTotalLateMin').textContent=lateMins+' د';
+  const totalH=Math.floor(workMins/60),totalM=workMins%60;
+  $('kpiTotalWorkHours').textContent=totalH+' س';
+  $('repRecordCount').textContent=tbody.children.length+' سجل';
+
+  $('monthlySummary').innerHTML=[
+    ['أيام الحضور',present],
+    ['أيام الغياب',abs],
+    ['أيام الإجازة',vac],
+    ['الأيام الناقصة',incomplete],
+    ['مرات التأخير',lateDays],
+    ['إجمالي ساعات العمل',`${totalH} س ${totalM} د`]
+  ].map(([a,b])=>`<div class="bg-cardBgDark rounded-xl p-2"><span class="block text-[10px] text-textMuted">${a}</span><strong>${b}</strong></div>`).join('');
+
+  renderMissingDays(range);
+  renderAuditLog();
+}
+function renderMissingDays(range){
+  const box=$('missingDaysList');
+  box.innerHTML='';
+  const start=new Date(range.startDate+'T12:00:00');
+  const end=new Date(range.endDate+'T12:00:00');
+  const today=new Date();today.setHours(0,0,0,0);
+  if(isNaN(start)||isNaN(end)||start>end){box.textContent='راجع ترتيب التواريخ.';return}
+  let cur=new Date(start),shown=0;
+  while(cur<=end&&shown<400){
+    if(cur>today)break;
+    const k=keyFor(cur);
+    const r=records[k];
+    const wd=cur.getDay();
+    const cfg=settings.weeklySchedule[wd];
+    if(cfg&&cfg.enabled!==false&&!r){
+      const item=document.createElement('div');
+      item.className='flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-cardBgDark rounded-xl p-2';
+      item.innerHTML=`
+        <div>
+          <b class="text-xs">${formatArabicDate(k)}</b>
+          <div class="text-[10px] text-goldWarning">ناقص للمراجعة</div>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          <button class="px-2 py-1 rounded-lg bg-rose-800 text-[10px]" onclick="approveDay('${k}','ABSENCE')">غياب</button>
+          <button class="px-2 py-1 rounded-lg bg-indigo-800 text-[10px]" onclick="approveDay('${k}','VACATION')">إجازة</button>
+          <button class="px-2 py-1 rounded-lg bg-tealPrimary text-[10px]" onclick="openNewRecord('${k}')">إضافة</button>
+        </div>`;
+      box.appendChild(item);
+      shown++;
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+  if(!shown)box.innerHTML='<p class="text-[10px] text-textMuted">لا توجد أيام ناقصة في الفترة.</p>';
+}
+function approveDay(k,status){
+  if(records[k]){showToast('اليوم لديه سجل بالفعل.');return}
+  if(!confirm(`اعتماد ${status==='ABSENCE'?'غياب':'إجازة'} بتاريخ ${k}؟`))return;
+  records[k]={checkIn:null,midCheck:null,checkOut:null,lateMinutes:0,status,dayStatus:status};
+  logEdit(status==='ABSENCE'?'اعتماد غياب':'اعتماد إجازة',k);
+  saveStorage();
+  if(k === todayKey()) cancelAndroidAlarms();
+  renderReports();
+  if(k===todayKey())renderMainScreen();
+  showToast('تم الاعتماد','success');
+}
+function openNewRecord(k){openRecordModal(null,k)}
+function openRecordModal(k,newDate){
+  const isNew=!k;
+  const date=newDate||k||todayKey();
+  const r=k?records[k]:{};
+  $('recordModalTitle').textContent=isNew?'إضافة تسجيل':'تعديل السجل';
+  $('editOriginalDate').value=k||'';
+  $('editDate').value=date;
+  $('editCheckIn').value=r?.checkIn||'';
+  $('editMidCheck').value=r?.midCheck||'';
+  $('editCheckOut').value=r?.checkOut||'';
+  $('editDayStatus').value=r?.dayStatus||'WORK';
+  $('recordModal').classList.remove('hidden');
+}
+function closeRecordModal(){$('recordModal').classList.add('hidden')}
+function saveRecordEdit(){
+  const oldKey=$('editOriginalDate').value;
+  const newKey=$('editDate').value;
+  if(!newKey){showToast('اختر تاريخ السجل');return}
+  const ci=$('editCheckIn').value||null;
+  const mid=$('editMidCheck').value||null;
+  const co=$('editCheckOut').value||null;
+  const dayStatus=$('editDayStatus').value;
+
+  if(dayStatus==='WORK'&&!ci){showToast('أدخل وقت الحضور أو اختر حالة أخرى');return}
+
+  if(ci&&co&&dayStatus==='WORK'){
+    const [ih,im]=ci.split(':').map(Number);
+    const [oh,om]=co.split(':').map(Number);
+    let diff=oh*60+om-(ih*60+im);
+    if(diff<0)diff+=1440;
+    if(diff>MAX_REASONABLE_SHIFT){
+      if(!confirm(`المدة المحسوبة ${Math.floor(diff/60)} ساعة، غير طبيعي. متابعة؟`))return;
+    }
+    if(diff<5){
+      if(!confirm('الانصراف خلال أقل من 5 دقائق. متابعة؟'))return;
+    }
+  }
+
+  if(newKey!==oldKey&&records[newKey]&&!confirm('يوجد سجل بالتاريخ الجديد. استبداله؟'))return;
+
+  const late=(ci&&dayStatus==='WORK')?calcLateSmart(ci,newKey):0;
+  const r={
+    checkIn:(dayStatus==='ABSENCE'||dayStatus==='VACATION')?null:ci,
+    midCheck:(dayStatus==='ABSENCE'||dayStatus==='VACATION')?null:mid,
+    checkOut:(dayStatus==='ABSENCE'||dayStatus==='VACATION')?null:co,
+    lateMinutes:late,
+    status:dayStatus==='ABSENCE'?'ABSENCE':
+           dayStatus==='VACATION'?'VACATION':
+           dayStatus==='INCOMPLETE'?'INCOMPLETE':
+           (!ci||!co)?'INCOMPLETE':
+           late>0?'LATE':'SUCCESS',
+    dayStatus
+  };
+  if(oldKey&&oldKey!==newKey)delete records[oldKey];
+  records[newKey]=r;
+  logEdit(oldKey?'تعديل سجل':'إضافة سجل',newKey,oldKey&&oldKey!==newKey?`نقل من ${oldKey}`:'');
+  saveStorage();
+
+  if(newKey === todayKey()){
+    if(r.checkIn && !r.checkOut && (r.dayStatus==='WORK' || r.dayStatus==='INCOMPLETE')){
+      const recDate = new Date(newKey + 'T12:00:00');
+      const cfg = settings.weeklySchedule[recDate.getDay()] || {hours: 8.5};
+      scheduleAndroidAlarms(r.checkIn, cfg.hours);
+    } else {
+      cancelAndroidAlarms();
+    }
+  }
+
+  closeRecordModal();
+  renderReports();
+  renderMainScreen();
+  showToast('تم حفظ السجل','success');
+}
+function deleteRecord(k){
+  if(!confirm(`حذف سجل ${k}؟ لا يمكن التراجع.`))return;
+  delete records[k];
+  logEdit('حذف سجل',k);
+  saveStorage();
+  if(k === todayKey()) cancelAndroidAlarms();
+  renderReports();
+  renderMainScreen();
+  showToast('تم الحذف','success');
+}
+function renderAuditLog(){
+  const box=$('auditLogList');
+  box.innerHTML='';
+  if(!auditLog.length){box.textContent='لا توجد تعديلات مسجلة.';return}
+  auditLog.slice(0,30).forEach(a=>{
+    const div=document.createElement('div');
+    div.className='bg-cardBgDark rounded-lg p-2';
+    div.textContent=`${new Date(a.at).toLocaleString('ar-EG')} — ${a.action} — ${a.date}${a.details?' — '+a.details:''}`;
+    box.appendChild(div);
+  });
+}
+
+function checkOpenAlerts(){
+  const alerts=[];
+  const {k,r}=findOpenRecord();
+
+  if(r&&r.checkIn&&!r.checkOut){
+    const isToday=k===todayKey();
+    alerts.push(isToday?'لم تسجل الانصراف بعد.':`شفت ${formatArabicDate(k)} مفتوح (بدون انصراف).`);
+    if(!r.midCheck){
+      const [h,m]=r.checkIn.split(':').map(Number);
+      const recDate=new Date(k+'T12:00:00');
+      const due=new Date(recDate);
+      due.setHours(h,m+240,0,0);
+      if(new Date()>=due)alerts.push('فات موعد بصمة المنتصف ولم تُسجل.');
+    }
+  }
+
+  const panel=$('alertsPanel');
+  if(alerts.length){
+    panel.innerHTML='<b class="block text-amber-300 text-xs">تنبيهات</b>'+
+      alerts.map(x=>`<p class="text-[11px]">• ${x}</p>`).join('');
+    panel.classList.remove('hidden');
+  }else panel.classList.add('hidden');
+}
+
+function initSettingsUI(){
+  $('setOfficialStart').value=settings.officialStart;
+  $('setGracePeriod').value=settings.gracePeriod;
+  const c=$('weeklyScheduleContainer');
+  c.innerHTML='';
+  Object.keys(settings.weeklySchedule).forEach(i=>{
+    const d=settings.weeklySchedule[i];
+    const el=document.createElement('div');
+    el.className='flex items-center justify-between gap-2 p-2 bg-cardBgDark rounded-xl border border-slate-800 text-xs';
+    el.innerHTML=`
+      <label class="flex items-center gap-1.5">
+        <input type="checkbox" id="dayEnabled_${i}" ${d.enabled?'checked':''}>
+        <b>${d.name}</b>
+      </label>
+      <label class="flex items-center gap-1.5">
+        <span class="text-textMuted">ساعات</span>
+        <input type="number" id="dayHours_${i}" value="${d.hours}" min="1" max="24" step="0.5" class="field w-16 text-center">
+      </label>`;
+    c.appendChild(el);
+  });
+}
+function saveShiftSettings(){
+  settings.officialStart=$('setOfficialStart').value||'07:00';
+  settings.gracePeriod=Math.max(0,Number($('setGracePeriod').value)||0);
+  Object.keys(settings.weeklySchedule).forEach(i=>{
+    settings.weeklySchedule[i].enabled=$('dayEnabled_'+i).checked;
+    settings.weeklySchedule[i].hours=Math.max(1,Math.min(24,Number($('dayHours_'+i).value)||8));
+  });
+  saveStorage();
+  renderMainScreen();
+  renderReports();
+  showToast('تم حفظ الإعدادات','success');
+}
+
+function exportBackupJSON(){
+  const data={settings,records,auditLog,exportedAt:new Date().toISOString()};
+  const json = JSON.stringify(data, null, 2);
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  const filename = `shift_basma_backup_${todayKey()}_${hh}-${mm}.json`;
+
+  if(window.AndroidAlarm && typeof window.AndroidAlarm.saveFile === 'function'){
+    window.AndroidAlarm.saveFile(json, filename, 'application/json');
+    localStorage.setItem('shift_bot_last_backup', todayKey());
+    updateBackupReminder();
+    showToast('تم حفظ النسخة في Downloads','success');
+    return;
+  }
+
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  localStorage.setItem('shift_bot_last_backup', todayKey());
+  updateBackupReminder();
+  showToast('تم إنشاء النسخة الاحتياطية','success');
+}
+function importBackupJSON(e){
+  const file=e.target.files?.[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.settings||!d.records)throw Error('invalid');
+      if(!confirm('الاستعادة ستستبدل البيانات الحالية. متأكد؟'))return;
+      settings={
+        ...structuredClone(DEFAULT_SETTINGS),
+        ...d.settings,
+        weeklySchedule:mergeSchedule(d.settings.weeklySchedule)
+      };
+      records=d.records;
+      Object.keys(records).forEach(k=>{
+        const r=records[k];
+        if(r.midCheck===undefined)r.midCheck=null;
+        if(r.lateMinutes===undefined)r.lateMinutes=0;
+        if(!r.dayStatus)r.dayStatus=(r.status==='ABSENCE'||r.status==='VACATION'||r.status==='INCOMPLETE')?r.status:'WORK';
+      });
+      auditLog=Array.isArray(d.auditLog)?d.auditLog:[];
+      saveStorage();
+      initSettingsUI();
+      renderMainScreen();
+      renderReports();
+      showToast('تمت الاستعادة','success');
+    }catch(err){showToast('ملف غير صالح','error')}
+    finally{e.target.value=''}
+  };
+  reader.readAsText(file);
+}
+function updateBackupReminder(){
+  const last=localStorage.getItem('shift_bot_last_backup');
+  const el=$('backupReminderText');
+  if(!last){el.textContent='لم تنشئ نسخة احتياطية بعد.';return;}
+  const age=Math.floor((new Date(todayKey())-new Date(last))/86400000);
+  el.textContent=age>=7?`مرّ ${age} يوم على آخر نسخة. أنشئ واحدة جديدة.`:`آخر نسخة: ${last}.`;
+}
+
+function resetAllData(){
+  if(!confirm('⚠️ سيتم حذف كل السجلات والإعدادات نهائياً. متأكد؟'))return;
+  if(!confirm('تأكيد أخير: هل أنشأت نسخة احتياطية؟'))return;
+  localStorage.removeItem('shift_bot_settings');
+  localStorage.removeItem('shift_bot_records');
+  localStorage.removeItem('shift_bot_audit');
+  localStorage.removeItem('shift_bot_last_backup');
+  settings=structuredClone(DEFAULT_SETTINGS);
+  records={};
+  auditLog=[];
+  initSettingsUI();
+  renderMainScreen();
+  renderReports();
+  updateBackupReminder();
+  showToast('تمت إعادة التعيين','success');
+}
+
+function exportToExcel(){
+  const range=getReportDateRange();
+  let csv='\uFEFFالتاريخ,الحضور,بصمة منتصف الدوام,الانصراف,مدة العمل بالدقائق,التأخير بالدقائق,الحالة\n';
+  Object.keys(records).sort().forEach(k=>{
+    if(k<range.startDate||k>range.endDate)return;
+    const r=records[k];
+    csv+=`"${k}","${r.checkIn||''}","${r.midCheck||''}","${r.checkOut||''}","${duration(r)??''}","${r.lateMinutes||0}","${statusLabel(r)}"\n`;
+  });
+  const filename = `تقرير_الحضور_${range.startDate}_إلى_${range.endDate}.csv`;
+
+  if(window.AndroidAlarm && typeof window.AndroidAlarm.saveFile === 'function'){
+    window.AndroidAlarm.saveFile(csv, filename, 'text/csv');
+    showToast('تم حفظ الملف في Downloads','success');
+    return;
+  }
+
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  showToast('تم تصدير CSV','success');
+}
+function exportToPDF(){
+  const doPrint = () => {
+    if(window.AndroidAlarm && typeof window.AndroidAlarm.printPage === 'function'){
+      window.AndroidAlarm.printPage();
+    } else {
+      window.print();
+    }
+  };
+  const rep=$('screen-reports');
+  if(rep.classList.contains('hidden')){
+    showToast('جارٍ فتح التقارير...');
+    switchTab('reports');
+    setTimeout(doPrint, 400);
+    return;
+  }
+  doPrint();
+}
+</script>
+</body>
+</html>
